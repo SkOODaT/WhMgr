@@ -198,7 +198,19 @@
             var wazeMapsLink = string.Format(Strings.WazeMaps, Latitude, Longitude);
             var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Raids.TemplateFile);
-            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Raids.ZoomLevel, Latitude, Longitude, raidImageUrl, Team);
+            // ***** FLO HACK *****
+            string FloPath = null;
+            if (IsEgg)
+            {
+                FloPath = $"egg?level={level}&lat={Latitude}&lon={Longitude}";
+            } else
+            {
+                FloPath = $"pokemon?id={PokemonId}&lat={Latitude}&lon={Longitude}";
+            }
+            //pokemon?id=${data.pokemon_id}&lat=${data.latitude}&lon=${data.longitude}
+            //egg?level=${data.level}&lat=${data.latitude}&lon=${data.longitude}
+            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Raids.ZoomLevel, Latitude, Longitude, FloPath, Team);
+            // ***** FLO HACK *****
             var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
             var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
             var wazeMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? wazeMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);

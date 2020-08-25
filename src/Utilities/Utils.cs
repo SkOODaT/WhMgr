@@ -59,7 +59,12 @@
                 markerUrl += polygonKey + Uri.EscapeDataString(polygonUrl);
             }
 
-            return markerUrl;
+            // ***** FLO HACK *****
+            var FloPath = staticMapUrl + markerImageUrl;
+            // ***** FLO HACK *****
+            _logger.Trace($"{FloPath}");
+
+            return FloPath;
         }
 
         public static bool SendSmsMessage(string body, TwilioConfig config, string toPhoneNumber)

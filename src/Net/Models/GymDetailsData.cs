@@ -138,7 +138,15 @@
             var wazeMapsLink = string.Format(Strings.WazeMaps, Latitude, Longitude);
             var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Gyms.TemplateFile);
-            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Gyms.ZoomLevel, Latitude, Longitude, /*TODO: Add team image*/string.Empty, Team);
+            // ***** FLO HACK *****
+            var guardCount = 6 - SlotsAvailable;
+            var teamNumber = Team == PokemonTeam.Mystic ? 1 :
+                    Team == PokemonTeam.Valor ? 2 :
+                    Team == PokemonTeam.Instinct ? 3 :
+                    0;
+            var FloPath = $"gym?new_team_id={teamNumber}&guard_count={guardCount}&lat={Latitude}&lon={Longitude}";
+            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Gyms.ZoomLevel, Latitude, Longitude, FloPath, Team);
+            // ***** FLO HACK *****
             //var staticMapLink = string.Format(whConfig.Urls.StaticMap, Latitude, Longitude);//whConfig.Urls.StaticMap.Gyms.Enabled ? string.Format(whConfig.Urls.StaticMap.Gyms.Url, Latitude, Longitude) : string.Empty
             var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
             var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
@@ -168,6 +176,7 @@
                                         : SlotsAvailable == 6
                                             ? "Empty"
                                             : SlotsAvailable.ToString("N0") },
+                { "guard_count", Convert.ToString(guardCount) },
 
                 //Location properties
                 { "geofence", city ?? defaultMissingValue },

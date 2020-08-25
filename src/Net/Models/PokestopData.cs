@@ -146,7 +146,18 @@
             var wazeMapsLink = string.Format(Strings.WazeMaps, Latitude, Longitude);
             var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, HasInvasion ? whConfig.StaticMaps.Invasions.TemplateFile : HasLure ? whConfig.StaticMaps.Lures.TemplateFile : whConfig.StaticMaps.Lures.TemplateFile);
-            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, HasInvasion ? whConfig.StaticMaps.Invasions.ZoomLevel : HasLure ? whConfig.StaticMaps.Lures.ZoomLevel : whConfig.StaticMaps.Lures.ZoomLevel, Latitude, Longitude, imageUrl, null);
+            // ***** FLO HACK *****
+            var pokestopNumber = HasInvasion ? 'i' : HasLure ?
+                    (LureType == PokestopLureType.Normal ? 1
+                    : LureType == PokestopLureType.Glacial ? 2
+                    : LureType == PokestopLureType.Mossy ? 3
+                    : LureType == PokestopLureType.Magnetic ? 4
+                    : 0) : 0;
+            var FloPath = $"pokestop?id={pokestopNumber}&lat={Latitude}&lon={Longitude}"; 
+            //pokestop?id=0&lat=${data.latitude}&lon=${data.longitude}
+            //invasion?id=${data.gruntTypeId}&lat=${data.latitude}&lon=${data.longitude}
+            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, HasInvasion ? whConfig.StaticMaps.Invasions.ZoomLevel : HasLure ? whConfig.StaticMaps.Lures.ZoomLevel : whConfig.StaticMaps.Lures.ZoomLevel, Latitude, Longitude, FloPath, null);
+            // ***** FLO HACK *****
             var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
             var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
             var wazeMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? wazeMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
