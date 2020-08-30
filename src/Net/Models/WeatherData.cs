@@ -147,7 +147,7 @@
             var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Weather.TemplateFile);
             // ***** FLO HACK *****
-            var FloPath = $"weather?weather_id={GameplayCondition}&lat={Latitude}&lon={Longitude}";
+            var FloPath = $"weather?weather_id={Convert.ToInt32(GameplayCondition)}&lat={Latitude}&lon={Longitude}";
             var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Weather.ZoomLevel, Latitude, Longitude, FloPath, null);
             // ***** FLO HACK *****
             var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
