@@ -62,7 +62,7 @@
             // ***** FLO HACK *****
             var FloPath = staticMapUrl + markerImageUrl;
             // ***** FLO HACK *****
-            _logger.Trace($"{FloPath}");
+            //_logger.Trace($"{FloPath}");
 
             return FloPath;
         }
@@ -87,24 +87,38 @@
 
         public static Location GetGoogleAddress(string city, double lat, double lng, string gmapsKey)
         {
-            var apiKey = string.IsNullOrEmpty(gmapsKey) ? string.Empty : $"&key={gmapsKey}";
-            var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&sensor=true{apiKey}";
+            // ***** OSM *****
+            var url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lng}";
+            // ***** OSM *****
+            //var apiKey = string.IsNullOrEmpty(gmapsKey) ? string.Empty : $"&key={gmapsKey}";
+            //var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&sensor=true{apiKey}";
             var unknown = "Unknown";
             try
             {
                 var request = (HttpWebRequest)WebRequest.Create(url);
+                request.UserAgent = "[Whmgr User-Agent]";
                 var response = request.GetResponse();
                 using (var responseStream = response.GetResponseStream())
                 {
                     var reader = new StreamReader(responseStream, Encoding.UTF8);
                     var data = reader.ReadToEnd();
-                    var parseJson = JObject.Parse(data);
-                    var status = Convert.ToString(parseJson["status"]);
-                    if (string.Compare(status, "OK", true) != 0)
-                        return null;
 
-                    var result = parseJson["results"].FirstOrDefault();
-                    var address = Convert.ToString(result["formatted_address"]);
+                    var parseJson = JObject.Parse(data);
+                    // ***** OSM *****
+                    //_logger.Trace($"{parseJson}");
+                    var osmhouse_number = Convert.ToString(parseJson["address"]["house_number"]);
+                    var osmroad = Convert.ToString(parseJson["address"]["road"]);
+                    var osmcity = Convert.ToString(parseJson["address"]["city"]);
+                    var osmneighbourhood = " **[" + Convert.ToString(parseJson["address"]["neighbourhood"])+ "]** ";
+                    var jsonToString = osmneighbourhood  + osmhouse_number + " " + osmroad + ", " + osmcity;
+                    var address = Convert.ToString(jsonToString);
+                    // ***** OSM *****
+                    //_logger.Trace($"{address}");
+                    //var status = Convert.ToString(parseJson["status"]);
+                    //if (string.Compare(status, "OK", true) != 0)
+                    //    return null;
+                    //var result = parseJson["results"].FirstOrDefault();
+                    //var address = Convert.ToString(result["formatted_address"]);
                     //var area = Convert.ToString(result["address_components"][2]["long_name"]);
                     return new Location(address, city ?? unknown, lat, lng);
                 }

@@ -331,3 +331,10 @@ ASALocalRun/
 .mfractor/
 
 .leu
+
+filters/
+geofences/
+stats/
+templates/
+alerts/
+alarms.json
