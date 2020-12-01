@@ -37,26 +37,27 @@
                 quest_reward_img_url = markerImageUrl,
                 weather_img_url = markerImageUrl,
                 tilemaps_url = staticMapUrl
-            }); ;
+            });
             StaticMapConfig staticMap = JsonConvert.DeserializeObject<StaticMapConfig>(staticMapData);
 
             var url = string.Format(staticMapUrl, latitude, longitude, staticMapZoom);
-            var markerUrl = staticMap.Markers.Count > 0 ? url + "?markers=" + Uri.EscapeDataString(JsonConvert.SerializeObject(staticMap.Markers)) : string.Empty;
+            //var markerUrl = staticMap.Markers.Count > 0 ? url + "?markers=" + Uri.EscapeDataString(JsonConvert.SerializeObject(staticMap.Markers)) : string.Empty;
+            var markerUrl = staticMap.Markers.Count > 0 ? url + "?markers=" + JsonConvert.SerializeObject(staticMap.Markers) : string.Empty;
 
             if (feature != null)
             {
-                var latlng = OsmManager.MultiPolygonToLatLng(feature.Geometry?.Coordinates);
+                var latlng = OsmManager.MultiPolygonToLatLng(feature.Geometry?.Coordinates, true);
                 var polygonKey = "&polygons=";
-                var polygonUrl = @"[{""fill_color"":""rgba(100.0%,0.0%,0.0%,0.5)"",""stroke_color"":""black"",""stroke_width"":1,""path"":" + latlng + "}]";
+                var polygonUrl = @"[{""fill_color"":""rgba(100.0%,0.0%,0.0%,0.5)"",""stroke_color"":""black"",""stroke_width"":1,""path"":""" + latlng + @"""}]";
                 markerUrl += polygonKey + Uri.EscapeDataString(polygonUrl);
             }
 
             if (multiPolygon != null)
             {
-                var latlng = OsmManager.MultiPolygonToLatLng(new List<MultiPolygon> { multiPolygon });
+                var latlng = OsmManager.MultiPolygonToLatLng(new List<MultiPolygon> { multiPolygon }, false);
                 var polygonKey = "&polygons=";
-                var polygonUrl = @"[{""fill_color"":""rgba(100.0%,0.0%,0.0%,0.5)"",""stroke_color"":""black"",""stroke_width"":1,""path"":" + latlng + "}]";
-                markerUrl += polygonKey + Uri.EscapeDataString(polygonUrl);
+                var polygonUrl = @"[{""fill_color"":""rgba(100.0%,0.0%,0.0%,0.5)"",""stroke_color"":""black"",""stroke_width"":1,""path"":""" + latlng + @"""}]";
+                markerUrl += polygonKey + polygonUrl;//Uri.EscapeDataString(polygonUrl);
             }
 
             return markerUrl;
@@ -78,6 +79,17 @@
             );
             //Console.WriteLine($"Response: {message}");
             return message.ErrorCode == null;
+        }
+
+        public static Location GetAddress(string city, double lat, double lng, WhConfig config)
+        {
+            if (!string.IsNullOrEmpty(config.GoogleMapsKey))
+                return GetGoogleAddress(city, lat, lng, config.GoogleMapsKey);
+
+            if (!string.IsNullOrEmpty(config.NominatimEndpoint))
+                return GetNominatimAddress(city, lat, lng, config.NominatimEndpoint);
+
+            return null;
         }
 
         public static Location GetGoogleAddress(string city, double lat, double lng, string gmapsKey)
@@ -109,6 +121,33 @@
                 _logger.Error(ex);
             }
             return null;
+        }
+
+        public static Location GetNominatimAddress(string city, double lat, double lng, string endpoint)
+        {
+            var unknown = "Unknown";
+            var url = $"{endpoint}/reverse?format=jsonv2&lat={lat}&lon={lng}";
+            try
+            {
+                using (var wc = new WebClient())
+                {
+                    wc.Proxy = null;
+                    wc.Headers.Add("User-Agent", Strings.BotName);
+                    var json = wc.DownloadString(url);
+                    dynamic obj = JsonConvert.DeserializeObject(json);
+                    return new Location(Convert.ToString(obj.display_name), city ?? unknown, Convert.ToDouble(obj.lat), Convert.ToDouble(obj.lon));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex);
+            }
+            return null;
+        }
+
+        public static double GetUnixTimestamp()
+        {
+            return DateTime.Now.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
         }
     }
 }

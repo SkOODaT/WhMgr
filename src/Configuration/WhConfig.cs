@@ -69,6 +69,13 @@
         public List<int> EventPokemonIds { get; set; }
 
         /// <summary>
+        /// Gets or sets the minimum IV value for an event Pokemon to be to process
+        /// for channel alarms or direct message subscriptions
+        /// </summary>
+        [JsonProperty("eventMinimumIV")]
+        public int EventMinimumIV { get; set; }
+
+        /// <summary>
         /// Gets or sets the icon styles
         /// </summary>
         [JsonProperty("iconStyles")]
@@ -91,6 +98,12 @@
         /// </summary>
         [JsonProperty("gmapsKey")]
         public string GoogleMapsKey { get; set; }
+
+        /// <summary>
+        /// Gets or sets the OpenStreetMaps Nominatim endpoint to use for reverse location lookup
+        /// </summary>
+        [JsonProperty("nominatim")]
+        public string NominatimEndpoint { get; set; }
 
         /// <summary>
         /// Gets or sets the minimum despawn time in minutes a Pokemon must have in order to send the alarm
@@ -135,6 +148,7 @@
             Database = new ConnectionStringsConfig();
             Urls = new UrlConfig();
             EventPokemonIds = new List<int>();
+            EventMinimumIV = 90;
             IconStyles = new Dictionary<string, string>();
             StaticMaps = new StaticMaps();
             Twilio = new TwilioConfig();

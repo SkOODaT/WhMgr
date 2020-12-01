@@ -88,8 +88,9 @@
 
         public DiscordEmbedNotification GenerateGymMessage(ulong guildId, DiscordClient client, WhConfig whConfig, AlarmObject alarm, GymDetailsData oldGym, string city)
         {
+            var server = whConfig.Servers[guildId];
             var alertType = AlertMessageType.Gyms;
-            var alert = alarm?.Alerts[alertType] ?? AlertMessage.Defaults[alertType];
+            var alert = alarm?.Alerts[alertType] ?? server.DmAlerts?[alertType] ?? AlertMessage.Defaults[alertType];
             var properties = GetProperties(client.Guilds[guildId], whConfig, city, oldGym);
             var eb = new DiscordEmbedBuilder
             {
@@ -104,8 +105,8 @@
                         DiscordColor.LightGray,
                 Footer = new DiscordEmbedBuilder.EmbedFooter
                 {
-                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text ?? client.Guilds[guildId]?.Name ?? DateTime.Now.ToString(), properties),
-                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl ?? client.Guilds[guildId]?.IconUrl ?? string.Empty, properties)
+                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text, properties),
+                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl, properties)
                 }
             };
             var username = DynamicReplacementEngine.ReplaceText(alert.Username, properties);
@@ -140,11 +141,11 @@
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Gyms.TemplateFile);
             var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Gyms.ZoomLevel, Latitude, Longitude, /*TODO: Add team image*/string.Empty, Team);
             //var staticMapLink = string.Format(whConfig.Urls.StaticMap, Latitude, Longitude);//whConfig.Urls.StaticMap.Gyms.Enabled ? string.Format(whConfig.Urls.StaticMap.Gyms.Url, Latitude, Longitude) : string.Empty
-            var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
-            var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
-            var wazeMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? wazeMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
-            var scannerMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? scannerMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
-            var googleAddress = Utils.GetGoogleAddress(city, Latitude, Longitude, whConfig.GoogleMapsKey);
+            var gmapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
+            var appleMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
+            var wazeMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
+            var scannerMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
+            var address = Utils.GetAddress(city, Latitude, Longitude, whConfig);
             //var staticMapLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? staticMapLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, staticMapLink);
 
             const string defaultMissingValue = "?";
@@ -175,8 +176,8 @@
                 { "geofence", city ?? defaultMissingValue },
                 { "lat", Latitude.ToString() },
                 { "lng", Longitude.ToString() },
-                { "lat_5", Math.Round(Latitude, 5).ToString() },
-                { "lng_5", Math.Round(Longitude, 5).ToString() },
+                { "lat_5", Latitude.ToString("0.00000") },
+                { "lng_5", Longitude.ToString("0.00000") },
 
                 //Location links
                 { "tilemaps_url", staticMapLink },
@@ -185,7 +186,7 @@
                 { "wazemaps_url", wazeMapsLocationLink },
                 { "scanmaps_url", scannerMapsLocationLink },
 
-                { "address", googleAddress?.Address },
+                { "address", address?.Address },
 
                 // Discord Guild properties
                 { "guild_name", guild?.Name },

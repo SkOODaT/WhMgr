@@ -102,19 +102,17 @@
 
         public void SetTimes()
         {
-            UpdatedTime = Updated.FromUnix();
-            //if (TimeZoneInfo.Local.IsDaylightSavingTime(Updated))
-            //{
-            //    UpdatedTime = UpdatedTime.AddHours(1);
-            //}
+            UpdatedTime = Updated
+                .FromUnix()
+                .ConvertTimeFromCoordinates(Latitude, Longitude);
         }
 
         public DiscordEmbedNotification GenerateWeatherMessage(ulong guildId, DiscordClient client, WhConfig whConfig, AlarmObject alarm, string city)
         {
-            var alertType = AlertMessageType.Weather;
-            var alert = alarm?.Alerts[alertType] ?? AlertMessage.Defaults[alertType];
             var server = whConfig.Servers[guildId];
-            var weatherImageUrl = this.GetWeatherIcon(whConfig, server.IconStyle);
+            var alertType = AlertMessageType.Weather;
+            var alert = alarm?.Alerts[alertType] ?? server.DmAlerts?[alertType] ?? AlertMessage.Defaults[alertType];
+            var weatherImageUrl = IconFetcher.Instance.GetWeatherIcon(server.IconStyle, GameplayCondition);
             var properties = GetProperties(client.Guilds[guildId], whConfig, city, weatherImageUrl);
             var eb = new DiscordEmbedBuilder
             {
@@ -123,11 +121,11 @@
                 ImageUrl = DynamicReplacementEngine.ReplaceText(alert.ImageUrl, properties),
                 ThumbnailUrl = DynamicReplacementEngine.ReplaceText(alert.IconUrl, properties),
                 Description = DynamicReplacementEngine.ReplaceText(alert.Content, properties),
-                Color = GameplayCondition.BuildWeatherColor(),
+                Color = GameplayCondition.BuildWeatherColor(server),
                 Footer = new DiscordEmbedBuilder.EmbedFooter
                 {
-                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text ?? client.Guilds[guildId]?.Name ?? DateTime.Now.ToString(), properties),
-                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl ?? client.Guilds[guildId]?.IconUrl ?? string.Empty, properties)
+                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text, properties),
+                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl, properties)
                 }
             };
             var username = DynamicReplacementEngine.ReplaceText(alert.Username, properties);
@@ -135,6 +133,10 @@
             var description = DynamicReplacementEngine.ReplaceText(alarm?.Description, properties);
             return new DiscordEmbedNotification(username, iconUrl, description, new List<DiscordEmbed> { eb.Build() });
         }
+
+        #endregion
+
+        #region Private Methods
 
         private IReadOnlyDictionary<string, string> GetProperties(DiscordGuild guild, WhConfig whConfig, string city, string weatherImageUrl)
         {
@@ -147,12 +149,12 @@
             var wazeMapsLink = string.Format(Strings.WazeMaps, Latitude, Longitude);
             var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Weather.TemplateFile);
-            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Weather.ZoomLevel, Latitude, Longitude, weatherImageUrl, null);
-            var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
-            var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
-            var wazeMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? wazeMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
-            var scannerMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? scannerMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
-            var googleAddress = Utils.GetGoogleAddress(city, Latitude, Longitude, whConfig.GoogleMapsKey);
+            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Weather.ZoomLevel, Latitude, Longitude, weatherImageUrl, null, null, Polygon);
+            var gmapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
+            var appleMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
+            var wazeMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
+            var scannerMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
+            var address = Utils.GetAddress(city, Latitude, Longitude, whConfig);
             //var staticMapLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? staticMapLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, staticMapLink);
 
             const string defaultMissingValue = "?";
@@ -180,8 +182,8 @@
                 { "geofence", city ?? defaultMissingValue },
                 { "lat", Latitude.ToString() },
                 { "lng", Longitude.ToString() },
-                { "lat_5", Math.Round(Latitude, 5).ToString() },
-                { "lng_5", Math.Round(Longitude, 5).ToString() },
+                { "lat_5", Latitude.ToString("0.00000") },
+                { "lng_5", Longitude.ToString("0.00000") },
 
                 //Location links
                 { "tilemaps_url", staticMapLink },
@@ -190,7 +192,7 @@
                 { "wazemaps_url", wazeMapsLocationLink },
                 { "scanmaps_url", scannerMapsLocationLink },
 
-                { "address", googleAddress?.Address },
+                { "address", address?.Address },
 
                 // Discord Guild properties
                 { "guild_name", guild?.Name },

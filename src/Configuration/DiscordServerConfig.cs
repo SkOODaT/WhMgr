@@ -1,7 +1,13 @@
 ﻿namespace WhMgr.Configuration
 {
+    using System;
     using System.Collections.Generic;
+    using System.IO;
+
     using Newtonsoft.Json;
+
+    using WhMgr.Alarms.Alerts;
+    using WhMgr.Data;
 
     /// <summary>
     /// Discord server configuration class
@@ -38,8 +44,8 @@
         /// <summary>
         /// Gets or sets the moderators of the Discord server
         /// </summary>
-        [JsonProperty("moderatorIds")]
-        public List<ulong> Moderators { get; set; }
+        [JsonProperty("moderatorRoleIds")]
+        public List<ulong> ModeratorRoleIds { get; set; }
 
         /// <summary>
         /// Gets or sets the Discord bot token
@@ -56,8 +62,10 @@
         /// <summary>
         /// Gets or sets whether to enable custom direct message subscriptions
         /// </summary>
-        [JsonProperty("enableSubscriptions")]
-        public bool EnableSubscriptions { get; set; }
+        //[JsonProperty("enableSubscriptions")]
+        //public bool EnableSubscriptions { get; set; }
+        [JsonProperty("subscriptions")]
+        public SubscriptionsConfig Subscriptions { get; set; }
 
         /// <summary>
         /// Gets or sets whether to enable Discord city roles
@@ -96,6 +104,12 @@
         public ulong NestsChannelId { get; set; }
 
         /// <summary>
+        /// Gets or sets the minimum nest spawns per hour to limit nest posts by
+        /// </summary>
+        [JsonProperty("nestsMinimumPerHour")]
+        public int NestsMinimumPerHour { get; set; }
+
+        /// <summary>
         /// Gets or sets the shiny stats configuration class
         /// </summary>
         [JsonProperty("shinyStats")]
@@ -119,17 +133,38 @@
         [JsonProperty("status")]
         public string Status { get; set; }
 
+        [JsonProperty("dmAlertsFile")]
+        public string DmAlertsFile { get; set; }
+
+        [JsonProperty("embedColors")]
+        public DiscordEmbedColorConfig DiscordEmbedColors { get; set; }
+
+        [JsonIgnore]
+        public AlertMessage DmAlerts { get; set; }
+
         /// <summary>
         /// Instantiate a new <see cref="DiscordServerConfig"/> class
         /// </summary>
         public DiscordServerConfig()
         {
             //Locale = "en";
-            Moderators = new List<ulong>();
+            ModeratorRoleIds = new List<ulong>();
             CityRoles = new List<string>();
             IconStyle = "Default";
             QuestChannelIds = new List<ulong>();
             ShinyStats = new ShinyStatsConfig();
+            Subscriptions = new SubscriptionsConfig();
+            NestsMinimumPerHour = 1;
+            DmAlertsFile = "default.json";
+            DiscordEmbedColors = new DiscordEmbedColorConfig();
+
+            LoadDmAlerts();
+        }
+
+        public void LoadDmAlerts()
+        {
+            var path = Path.Combine(Strings.AlertsFolder, DmAlertsFile);
+            DmAlerts = MasterFile.LoadInit<AlertMessage>(path);
         }
     }
 }

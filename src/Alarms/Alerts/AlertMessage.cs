@@ -11,7 +11,7 @@
                 AlertMessageType.Pokemon, new AlertMessageSettings
                 {
                     AvatarUrl = "<pkmn_img_url>",
-                    Content = "<pkmn_name> <form><gender> <iv> (<atk_iv>/<def_iv>/<sta_iv>) L<lvl><br>**Despawn:** <despawn_time> (<time_left> left)<br>**Details:** CP: <cp> IV: <iv> LV: <lvl><br>**Types:** <types_emoji> | **Size:** <size><#has_weather> | <weather_emoji><#is_weather_boosted> (Boosted)</is_weather_boosted></has_weather><br>**Moveset:** <moveset><br><#near_pokestop>**Near Pokestop:** [<pokestop_name>](<pokestop_url>)<br></near_pokestop><#is_ditto>**Catch Pokemon:** <original_pkmn_name><br></is_ditto><#has_capture_rates><capture_1_emoji> <capture_1>% <capture_2_emoji> <capture_2>% <capture_3_emoji> <capture_3>%<br></has_capture_rates><#is_event>Go Fest Spawn<br></is_event><#is_pvp><br><pvp_stats></is_pvp>**[[Google](<gmaps_url>)] [[Apple](<applemaps_url>)] [[Waze](<wazemaps_url>)] [[Scanner](<scanmaps_url>)]**",
+                    Content = "<pkmn_name> <form><gender> <iv> (<atk_iv>/<def_iv>/<sta_iv>) L<lvl><br>**Despawn:** <despawn_time> (<time_left> left)<br>**Details:** CP: <cp> IV: <iv> LV: <lvl><br><types_emoji> | **Size:** <size><#has_weather> | <weather_emoji><#is_weather_boosted> (Boosted)</is_weather_boosted></has_weather><br>**Moveset:** <moveset><br><#near_pokestop>**Near Pokestop:** [<pokestop_name>](<pokestop_url>)<br></near_pokestop><#is_ditto>**Catch Pokemon:** <original_pkmn_name><br></is_ditto><#has_capture_rates><capture_1_emoji> <capture_1>% <capture_2_emoji> <capture_2>% <capture_3_emoji> <capture_3>%<br></has_capture_rates><#is_event>Go Fest Spawn<br></is_event><#is_pvp><br><pvp_stats></is_pvp>**[[Google](<gmaps_url>)] [[Apple](<applemaps_url>)] [[Waze](<wazemaps_url>)] [[Scanner](<scanmaps_url>)]**",
                     IconUrl = "<pkmn_img_url>",
                     Title = "<geofence>",
                     Url = "<gmaps_url>",
@@ -62,7 +62,7 @@
                 AlertMessageType.Raids, new AlertMessageSettings
                 {
                     AvatarUrl = "<pkmn_img_url>",
-                    Content = "<pkmn_name> Raid Ends: <end_time> (<end_time_left> left)<br>**Perfect CP:** <perfect_cp> / :white_sun_rain_cloud: <perfect_cp_boosted><br>**Worst CP:** <worst_cp> / :white_sun_rain_cloud: <worst_cp_boosted><br>**Types:** <types_emoji> | **Level:** <lvl> | **Team:** <team_emoji><br>**Moveset:** <moveset><br>**Weaknesses:** <weaknesses_emoji><br><#is_ex><ex_emoji> Gym!<br></is_ex>**[[Google](<gmaps_url>)] [[Apple](<applemaps_url>)] [[Waze](<wazemaps_url>)] [[Scanner](<scanmaps_url>)]**",
+                    Content = "<evolution> <pkmn_name> Raid Ends: <end_time> (<end_time_left> left)<br>**Perfect CP:** <perfect_cp> / :white_sun_rain_cloud: <perfect_cp_boosted><br>**Worst CP:** <worst_cp> / :white_sun_rain_cloud: <worst_cp_boosted><br>**Types:** <types_emoji> | **Level:** <lvl> | **Team:** <team_emoji><br>**Moveset:** <moveset><br>**Weaknesses:** <weaknesses_emoji><br><#is_ex><ex_emoji> Gym!<br></is_ex>**[[Google](<gmaps_url>)] [[Apple](<applemaps_url>)] [[Waze](<wazemaps_url>)] [[Scanner](<scanmaps_url>)]**",
                     IconUrl = "<pkmn_img_url>",
                     Title = "<geofence>: <gym_name>",
                     Url = "<gmaps_url>",

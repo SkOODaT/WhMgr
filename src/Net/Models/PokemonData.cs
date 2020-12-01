@@ -3,12 +3,12 @@
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
 
     using DSharpPlus;
     using DSharpPlus.Entities;
-
     using Newtonsoft.Json;
     using ServiceStack.DataAnnotations;
 
@@ -376,13 +376,20 @@
         /// </summary>
         public void SetDespawnTime()
         {
-            DespawnTime = DisappearTime.FromUnix();
+            DespawnTime = DisappearTime
+                .FromUnix()
+                .ConvertTimeFromCoordinates(Latitude, Longitude);
 
-            SecondsLeft = DespawnTime.Subtract(DateTime.Now);
+            SecondsLeft = DespawnTime
+                .Subtract(DateTime.UtcNow.ConvertTimeFromCoordinates(Latitude, Longitude));
 
-            FirstSeenTime = FirstSeen.FromUnix();
+            FirstSeenTime = FirstSeen
+                .FromUnix()
+                .ConvertTimeFromCoordinates(Latitude, Longitude);
 
-            LastModifiedTime = LastModified.FromUnix();
+            LastModifiedTime = LastModified
+                .FromUnix()
+                .ConvertTimeFromCoordinates(Latitude, Longitude);
         }
 
         /// <summary>
@@ -397,11 +404,17 @@
         public async Task<DiscordEmbedNotification> GeneratePokemonMessage(ulong guildId, DiscordClient client, WhConfig whConfig, AlarmObject alarm, string city)
         {
             // If IV has value then use alarmText if not null otherwise use default. If no stats use default missing stats alarmText
-            var alertType = IsMissingStats ? AlertMessageType.PokemonMissingStats : AlertMessageType.Pokemon;
-            var alert = alarm?.Alerts[alertType] ?? AlertMessage.Defaults[alertType];
             var server = whConfig.Servers[guildId];
-            var pokemonImageUrl = Id.GetPokemonIcon(FormId, Costume, whConfig, server.IconStyle);
-            var properties = await GetProperties(client.Guilds[guildId], whConfig, city, pokemonImageUrl);
+            var alertType = IsMissingStats ? AlertMessageType.PokemonMissingStats : AlertMessageType.Pokemon;
+            var alert = alarm?.Alerts[alertType] ?? server.DmAlerts?[alertType] ?? AlertMessage.Defaults[alertType];
+            var pokemonImageUrl = IconFetcher.Instance.GetPokemonIcon(server.IconStyle, Id, FormId, 0, Gender, Costume, false);
+            var properties = await GetProperties(new MessageProperties
+            {
+                Guild = client.Guilds[guildId],
+                Config = whConfig,
+                City = city,
+                ImageUrl = pokemonImageUrl,
+            });
             var eb = new DiscordEmbedBuilder
             {
                 Title = DynamicReplacementEngine.ReplaceText(alert.Title, properties),
@@ -409,11 +422,13 @@
                 ImageUrl = DynamicReplacementEngine.ReplaceText(alert.ImageUrl, properties),
                 ThumbnailUrl = DynamicReplacementEngine.ReplaceText(alert.IconUrl, properties),
                 Description = DynamicReplacementEngine.ReplaceText(alert.Content, properties),
-                Color = IV.BuildColor(),
+                Color = MatchesGreatLeague || MatchesUltraLeague
+                    ? GetPvPColor(GreatLeague, UltraLeague, server)
+                    : IV.BuildPokemonIVColor(server),
                 Footer = new DiscordEmbedBuilder.EmbedFooter
                 {
-                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text ?? client.Guilds[guildId]?.Name ?? DateTime.Now.ToString(), properties),
-                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl ?? client.Guilds[guildId]?.IconUrl ?? string.Empty, properties)
+                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text, properties),
+                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl, properties)
                 }
             };
             var username = DynamicReplacementEngine.ReplaceText(alert.Username, properties);
@@ -422,14 +437,32 @@
             return await Task.FromResult(new DiscordEmbedNotification(username, iconUrl, description, new List<DiscordEmbed> { eb.Build() }));
         }
 
+        private DiscordColor GetPvPColor(List<PVPRank> greatLeague, List<PVPRank> ultraLeague, DiscordServerConfig server)
+        {
+            if (greatLeague != null)
+                greatLeague.Sort((x, y) => (x.Rank ?? 0).CompareTo(y.Rank ?? 0));
+
+            if (ultraLeague != null)
+                ultraLeague.Sort((x, y) => (x.Rank ?? 0).CompareTo(y.Rank ?? 0));
+
+            var greatRank = greatLeague.FirstOrDefault(x => x.Rank > 0 && x.Rank <= 25 && x.CP >= Strings.MinimumGreatLeagueCP && x.CP <= Strings.MaximumGreatLeagueCP);
+            var ultraRank = ultraLeague.FirstOrDefault(x => x.Rank > 0 && x.Rank <= 25 && x.CP >= Strings.MinimumUltraLeagueCP && x.CP <= Strings.MaximumUltraLeagueCP);
+            var color = server.DiscordEmbedColors.Pokemon.PvP.FirstOrDefault(x => ((greatRank?.Rank ?? 0) >= x.Minimum && (greatRank?.Rank ?? 0) <= x.Maximum) || ((ultraRank?.Rank ?? 0) >= x.Minimum && (ultraRank?.Rank ?? 0) <= x.Maximum));
+            if (color == null)
+            {
+                return DiscordColor.White;
+            }
+            return new DiscordColor(color.Color);
+        }
+
         #endregion
 
-        private async Task<IReadOnlyDictionary<string, string>> GetProperties(DiscordGuild guild, WhConfig whConfig, string city, string pokemonImageUrl)
+        private async Task<IReadOnlyDictionary<string, string>> GetProperties(MessageProperties properties)// DiscordGuild guild, WhConfig whConfig, string city, string pokemonImageUrl)
         {
             var pkmnInfo = MasterFile.GetPokemon(Id, FormId);
             var pkmnName = Translator.Instance.GetPokemonName(Id);
             var form = Translator.Instance.GetFormName(FormId);
-            var costume = Id.GetCostume(Costume.ToString());
+            var costume = Translator.Instance.GetCostumeName(Costume);
             var gender = Gender.GetPokemonGenderIcon();
             var genderEmoji = Gender.GetGenderEmojiIcon();
             var level = Level;
@@ -443,16 +476,8 @@
                     ? (Weather ?? WeatherType.None).GetWeatherEmojiIcon()
                     : string.Empty
                 : MasterFile.Instance.CustomEmojis[weatherKey];
-            var move1 = "Unknown";
-            var move2 = "Unknown";
-            if (int.TryParse(FastMove, out var fastMoveId))
-            {
-                move1 = Translator.Instance.GetMoveName(fastMoveId);
-            }
-            if (int.TryParse(ChargeMove, out var chargeMoveId))
-            {
-                move2 = Translator.Instance.GetMoveName(chargeMoveId);
-            }
+            var move1 = int.TryParse(FastMove, out var fastMoveId) ? Translator.Instance.GetMoveName(fastMoveId) : "Unknown";
+            var move2 = int.TryParse(ChargeMove, out var chargeMoveId) ? Translator.Instance.GetMoveName(chargeMoveId) : "Unknown";
             var type1 = pkmnInfo?.Types?[0];
             var type2 = pkmnInfo?.Types?.Count > 1 ? pkmnInfo.Types?[1] : PokemonType.None;
             var type1Emoji = pkmnInfo?.Types?[0].GetTypeEmojiIcons();
@@ -466,22 +491,19 @@
             var gmapsLink = string.Format(Strings.GoogleMaps, Latitude, Longitude);
             var appleMapsLink = string.Format(Strings.AppleMaps, Latitude, Longitude);
             var wazeMapsLink = string.Format(Strings.WazeMaps, Latitude, Longitude);
-            var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
-            var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Pokemon.TemplateFile);
-            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Pokemon.ZoomLevel, Latitude, Longitude, pokemonImageUrl, null);
-            var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
-            var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
-            var wazeMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? wazeMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
-            var scannerMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? scannerMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
-            var googleAddress = Utils.GetGoogleAddress(city, Latitude, Longitude, whConfig.GoogleMapsKey);
+            var scannerMapsLink = string.Format(properties.Config.Urls.ScannerMap, Latitude, Longitude);
+            var templatePath = Path.Combine(properties.Config.StaticMaps.TemplatesFolder, properties.Config.StaticMaps.Pokemon.TemplateFile);
+            var staticMapLink = Utils.GetStaticMapsUrl(templatePath, properties.Config.Urls.StaticMap, properties.Config.StaticMaps.Pokemon.ZoomLevel, Latitude, Longitude, properties.ImageUrl, null);
+            var gmapsLocationLink = UrlShortener.CreateShortUrl(properties.Config.ShortUrlApiUrl, gmapsLink);
+            var appleMapsLocationLink = UrlShortener.CreateShortUrl(properties.Config.ShortUrlApiUrl, appleMapsLink);
+            var wazeMapsLocationLink = UrlShortener.CreateShortUrl(properties.Config.ShortUrlApiUrl, wazeMapsLink);
+            var scannerMapsLocationLink = UrlShortener.CreateShortUrl(properties.Config.ShortUrlApiUrl, scannerMapsLink);
+            var address = Utils.GetAddress(properties.City, Latitude, Longitude, properties.Config);
             //var staticMapLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? staticMapLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, staticMapLink);
             var pokestop = Pokestop.Pokestops.ContainsKey(PokestopId) ? Pokestop.Pokestops[PokestopId] : null;
 
-            var isGreat = MatchesGreatLeague;
-            var isUltra = MatchesUltraLeague;
             var greatLeagueEmoji = PvPLeague.Great.GetLeagueEmojiIcon();
             var ultraLeagueEmoji = PvPLeague.Ultra.GetLeagueEmojiIcon();
-            var isPvP = isGreat || isUltra;
             var pvpStats = await GetPvP();
 
             const string defaultMissingValue = "?";
@@ -491,7 +513,7 @@
                 { "pkmn_id", Convert.ToString(Id) },
                 { "pkmn_id_3", Id.ToString("D3") },
                 { "pkmn_name", pkmnName },
-                { "pkmn_img_url", pokemonImageUrl },
+                { "pkmn_img_url", properties.ImageUrl },
                 { "form", form },
                 { "form_id", Convert.ToString(FormId) },
                 { "form_id_3", FormId.ToString("D3") },
@@ -521,17 +543,17 @@
 
                 // Catch rate properties
                 { "has_capture_rates",  Convert.ToString(CatchRate1.HasValue && CatchRate2.HasValue && CatchRate3.HasValue) },
-                { "capture_1", CatchRate1.HasValue ? Math.Round(CatchRate1.Value * 100, 2).ToString() : string.Empty },
-                { "capture_2", CatchRate2.HasValue ? Math.Round(CatchRate2.Value * 100, 2).ToString() : string.Empty },
-                { "capture_3", CatchRate3.HasValue ? Math.Round(CatchRate3.Value * 100, 2).ToString() : string.Empty },
+                { "capture_1", CatchRate1.HasValue ? Math.Round(CatchRate1.Value * 100).ToString() : string.Empty },
+                { "capture_2", CatchRate2.HasValue ? Math.Round(CatchRate2.Value * 100).ToString() : string.Empty },
+                { "capture_3", CatchRate3.HasValue ? Math.Round(CatchRate3.Value * 100).ToString() : string.Empty },
                 { "capture_1_emoji", CaptureRateType.PokeBall.GetCaptureRateEmojiIcon() },
                 { "capture_2_emoji", CaptureRateType.GreatBall.GetCaptureRateEmojiIcon() },
                 { "capture_3_emoji", CaptureRateType.UltraBall.GetCaptureRateEmojiIcon() },
 
                 // PvP stat properties
-                { "is_great", Convert.ToString(isGreat) },
-                { "is_ultra", Convert.ToString(isUltra) },
-                { "is_pvp", Convert.ToString(isPvP) },
+                { "is_great", Convert.ToString(MatchesGreatLeague) },
+                { "is_ultra", Convert.ToString(MatchesUltraLeague) },
+                { "is_pvp", Convert.ToString(MatchesGreatLeague || MatchesUltraLeague) },
                 //{ "great_league_stats", greatLeagueStats },
                 //{ "ultra_league_stats", ultraLeagueStats },
                 { "great_league_emoji", greatLeagueEmoji },
@@ -561,11 +583,11 @@
                 { "time_left", SecondsLeft.ToReadableString(true) ?? defaultMissingValue },
 
                 // Location properties
-                { "geofence", city ?? defaultMissingValue },
+                { "geofence", properties.City ?? defaultMissingValue },
                 { "lat", Convert.ToString(Latitude) },
                 { "lng", Convert.ToString(Longitude) },
-                { "lat_5", Convert.ToString(Math.Round(Latitude, 5)) },
-                { "lng_5", Convert.ToString(Math.Round(Longitude, 5)) },
+                { "lat_5", Latitude.ToString("0.00000") },
+                { "lng_5", Longitude.ToString("0.00000") },
 
                 // Location links
                 { "tilemaps_url", staticMapLink },
@@ -574,7 +596,7 @@
                 { "wazemaps_url", wazeMapsLocationLink },
                 { "scanmaps_url", scannerMapsLocationLink },
 
-                { "address", googleAddress?.Address },
+                { "address", address?.Address },
 
                 // Pokestop properties
                 { "near_pokestop", Convert.ToString(pokestop != null) },
@@ -583,8 +605,8 @@
                 { "pokestop_url", pokestop?.Url ?? defaultMissingValue },
 
                 // Discord Guild properties
-                { "guild_name", guild?.Name },
-                { "guild_img_url", guild?.IconUrl },
+                { "guild_name", properties.Guild?.Name },
+                { "guild_img_url", properties.Guild?.IconUrl },
 
                 // Event properties
                 { "is_event", Convert.ToString(IsEvent.HasValue && IsEvent.Value) },
@@ -645,7 +667,7 @@
                     }
                     var name = Translator.Instance.GetPokemonName(pvp.PokemonId);
                     var form = Translator.Instance.GetFormName(pvp.FormId);
-                    var pkmnName = string.Compare(form, "Normal", true) == 0 ? name : $"{name} ({form})"; // TODO: Localize `Normal` text
+                    var pkmnName = string.IsNullOrEmpty(form) ? name : $"{name} ({form})"; // TODO: Localize `Normal` text
                     if ((pvp.Rank.HasValue && pvp.Rank.Value <= MaximumRankPVP) && pvp.Percentage.HasValue && pvp.Level.HasValue && pvp.CP.HasValue && pvp.CP <= Strings.MaximumGreatLeagueCP)
                     {
                         sb.AppendLine($"{rankText} #{pvp.Rank.Value} {pkmnName} {pvp.CP.Value}{cpText} @ L{pvp.Level.Value} {Math.Round(pvp.Percentage.Value * 100, 2)}%");
@@ -684,7 +706,7 @@
                     }
                     var name = Translator.Instance.GetPokemonName(pvp.PokemonId);
                     var form = Translator.Instance.GetFormName(pvp.FormId);
-                    var pkmnName = string.Compare(form, "Normal", true) == 0 ? name : $"{name} ({form})"; // TODO: Localize `Normal` text
+                    var pkmnName = string.IsNullOrEmpty(form) ? name : $"{name} ({form})"; // TODO: Localize `Normal` text
                     if ((pvp.Rank.HasValue && pvp.Rank.Value <= MaximumRankPVP) && pvp.Percentage.HasValue && pvp.Level.HasValue && pvp.CP.HasValue && pvp.CP <= Strings.MaximumUltraLeagueCP)
                     {
                         sb.AppendLine($"{rankText} #{pvp.Rank.Value} {pkmnName} {pvp.CP.Value}{cpText} @ L{pvp.Level.Value} {Math.Round(pvp.Percentage.Value * 100, 2)}%");
@@ -702,6 +724,17 @@
         }
 
         #endregion
+    }
+
+    public class MessageProperties
+    {
+        public DiscordGuild Guild { get; set; }
+
+        public WhConfig Config { get; set; }
+
+        public string City { get; set; }
+
+        public string ImageUrl { get; set; }
     }
 
     /// <summary>

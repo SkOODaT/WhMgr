@@ -30,7 +30,16 @@
 
         public override string Translate(string value)
         {
-            return base.Translate(value);
+            try
+            {
+                return base.Translate(value);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.Error($"Failed to find locale translation for key '{value}'");
+                _logger.Error(ex);
+            }
+            return value;
         }
 
         public string Translate(string value, params object[] args)
@@ -41,7 +50,7 @@
                     ? string.Format(base.Translate(value), args)
                     : base.Translate(value);
             }
-            catch (Exception ex)
+            catch (KeyNotFoundException ex)
             {
                 _logger.Error($"Failed to find locale translation for key '{value}' and arguments: '{string.Join(",", args)}'");
                 _logger.Error(ex);
@@ -66,15 +75,21 @@
             return form;
         }
 
+        public string GetCostumeName(int costumeId)
+        {
+            if (costumeId == 0)
+                return null;
+
+            var costume = Translate("costume_" + costumeId);
+            return costume;
+        }
+
         public string GetEvolutionName(int evoId)
         {
             if (evoId == 0)
                 return null;
 
             var evo = Translate("evo_" + evoId);
-            // TODO: Localize
-            if (string.Compare(evo, "Normal", true) == 0)
-                return string.Empty;
             return evo;
         }
 
@@ -99,6 +114,21 @@
         public string GetWeather(WeatherType weather)
         {
             return Translate($"weather_{(int)weather}");
+        }
+
+        public string GetAlignmentName(PokemonAlignment alignment)
+        {
+            return Translate($"alignment_{(int)alignment}");
+        }
+
+        public string GetCharacterCategoryName(CharacterCategory category)
+        {
+            return Translate($"character_category_{(int)category}");
+        }
+
+        public string GetEvolutionName(MegaEvolution evolution)
+        {
+            return Translate($"evo_{(int)evolution}");
         }
     }
 }

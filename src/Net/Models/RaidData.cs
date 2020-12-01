@@ -74,6 +74,9 @@
         [JsonProperty("form")]
         public int Form { get; set; }
 
+        [JsonProperty("costume")]
+        public int Costume { get; set; }
+
         [JsonProperty("evolution")]
         public int Evolution { get; set; }
 
@@ -110,7 +113,7 @@
         }
 
         [JsonIgnore]
-        public bool IsMissingStats => FastMove == 0;
+        public bool IsMissingStats => FastMove == 0 || ChargeMove == 0;
 
         #endregion
 
@@ -127,9 +130,13 @@
         /// </summary>
         public void SetTimes()
         {
-            StartTime = Start.FromUnix();
+            StartTime = Start
+                .FromUnix()
+                .ConvertTimeFromCoordinates(Latitude, Longitude);
 
-            EndTime = End.FromUnix();
+            EndTime = End
+                .FromUnix()
+                .ConvertTimeFromCoordinates(Latitude, Longitude);
         }
 
         /// <summary>
@@ -143,12 +150,12 @@
         /// <returns>DiscordEmbedNotification object to send</returns>
         public DiscordEmbedNotification GenerateRaidMessage(ulong guildId, DiscordClient client, WhConfig whConfig, AlarmObject alarm, string city)
         {
-            var alertType = PokemonId > 0 ? AlertMessageType.Raids : AlertMessageType.Eggs;
-            var alert = alarm?.Alerts[alertType] ?? AlertMessage.Defaults[alertType];
             var server = whConfig.Servers[guildId];
+            var alertType = PokemonId > 0 ? AlertMessageType.Raids : AlertMessageType.Eggs;
+            var alert = alarm?.Alerts[alertType] ?? server.DmAlerts?[alertType] ?? AlertMessage.Defaults[alertType];
             var raidImageUrl = IsEgg ?
-                this.GetRaidEggIcon(whConfig, server.IconStyle) :
-                PokemonId.GetPokemonIcon(Form, 0, whConfig, server.IconStyle);
+                IconFetcher.Instance.GetRaidEggIcon(server.IconStyle, Convert.ToInt32(Level), false, IsExEligible) :
+                IconFetcher.Instance.GetPokemonIcon(server.IconStyle, PokemonId, Form, Evolution, Gender, Costume, false);
             var properties = GetProperties(client.Guilds[guildId], whConfig, city, raidImageUrl);
             var eb = new DiscordEmbedBuilder
             {
@@ -157,11 +164,11 @@
                 ImageUrl = DynamicReplacementEngine.ReplaceText(alert.ImageUrl, properties),
                 ThumbnailUrl = DynamicReplacementEngine.ReplaceText(alert.IconUrl, properties),
                 Description = DynamicReplacementEngine.ReplaceText(alert.Content, properties),
-                Color = Level.BuildRaidColor(),
+                Color = (IsExEligible ? 0 /*ex*/ : int.Parse(Level)).BuildRaidColor(server),
                 Footer = new DiscordEmbedBuilder.EmbedFooter
                 {
-                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text ?? client.Guilds[guildId]?.Name ?? DateTime.Now.ToString(), properties),
-                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl ?? client.Guilds[guildId]?.IconUrl ?? string.Empty, properties)
+                    Text = DynamicReplacementEngine.ReplaceText(alert.Footer?.Text, properties),
+                    IconUrl = DynamicReplacementEngine.ReplaceText(alert.Footer?.IconUrl, properties)
                 }
             };
             var username = DynamicReplacementEngine.ReplaceText(alert.Username, properties);
@@ -203,12 +210,16 @@
             var scannerMapsLink = string.Format(whConfig.Urls.ScannerMap, Latitude, Longitude);
             var templatePath = Path.Combine(whConfig.StaticMaps.TemplatesFolder, whConfig.StaticMaps.Raids.TemplateFile);
             var staticMapLink = Utils.GetStaticMapsUrl(templatePath, whConfig.Urls.StaticMap, whConfig.StaticMaps.Raids.ZoomLevel, Latitude, Longitude, raidImageUrl, Team);
-            var gmapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? gmapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
-            var appleMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? appleMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
-            var wazeMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? wazeMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
-            var scannerMapsLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? scannerMapsLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
-            var googleAddress = Utils.GetGoogleAddress(city, Latitude, Longitude, whConfig.GoogleMapsKey);
+            var gmapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, gmapsLink);
+            var appleMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, appleMapsLink);
+            var wazeMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, wazeMapsLink);
+            var scannerMapsLocationLink = UrlShortener.CreateShortUrl(whConfig.ShortUrlApiUrl, scannerMapsLink);
+            var address = Utils.GetAddress(city, Latitude, Longitude, whConfig);
             //var staticMapLocationLink = string.IsNullOrEmpty(whConfig.ShortUrlApiUrl) ? staticMapLink : NetUtil.CreateShortUrl(whConfig.ShortUrlApiUrl, staticMapLink);
+
+            var now = DateTime.UtcNow.ConvertTimeFromCoordinates(Latitude, Longitude);
+            var startTimeLeft = now.GetTimeRemaining(StartTime).ToReadableStringNoSeconds();
+            var endTimeLeft = now.GetTimeRemaining(EndTime).ToReadableStringNoSeconds();
 
             const string defaultMissingValue = "?";
             var dict = new Dictionary<string, string>
@@ -252,17 +263,17 @@
                 //Time properties
                 { "start_time", StartTime.ToLongTimeString() },
                 { "start_time_24h", StartTime.ToString("HH:mm:ss") },
-                { "start_time_left", DateTime.Now.GetTimeRemaining(StartTime).ToReadableStringNoSeconds() },
+                { "start_time_left", startTimeLeft },
                 { "end_time", EndTime.ToLongTimeString() },
                 { "end_time_24h", EndTime.ToString("HH:mm:ss") },
-                { "end_time_left", EndTime.GetTimeRemaining().ToReadableStringNoSeconds() },
+                { "end_time_left", endTimeLeft },
 
                 //Location properties
                 { "geofence", city ?? defaultMissingValue },
                 { "lat", Latitude.ToString() },
                 { "lng", Longitude.ToString() },
-                { "lat_5", Math.Round(Latitude, 5).ToString() },
-                { "lng_5", Math.Round(Longitude, 5).ToString() },
+                { "lat_5", Latitude.ToString("0.00000") },
+                { "lng_5", Longitude.ToString("0.00000") },
 
                 //Location links
                 { "tilemaps_url", staticMapLink },
@@ -271,7 +282,7 @@
                 { "wazemaps_url", wazeMapsLocationLink },
                 { "scanmaps_url", scannerMapsLocationLink },
 
-                { "address", googleAddress?.Address },
+                { "address", address?.Address },
 
                 //Gym properties
                 { "gym_id", GymId },

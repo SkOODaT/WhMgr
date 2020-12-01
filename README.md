@@ -1,11 +1,16 @@
-# Brock Webhook Manager v4.0  
+[![Build](https://github.com/versx/WhMgr/workflows/.NET%20Core/badge.svg)](https://github.com/versx/WhMgr/actions)
+[![Documentation Status](https://readthedocs.org/projects/whmgr/badge/?version=latest)](https://whmgr.rtfd.io)
+[![GitHub Release](https://img.shields.io/github/release/versx/WhMgr.svg)](https://github.com/versx/WhMgr/releases/)
+[![GitHub Contributors](https://img.shields.io/github/contributors/versx/WhMgr.svg)](https://github.com/versx/WhMgr/graphs/contributors/)
+[![Discord](https://img.shields.io/discord/552003258000998401.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/zZ9h9Xa)  
+# Webhook Manager v4  
 
-### PokeAlarm, Poracle, WDR, etc alternative.  
+### PokeAlarm, PoracleJS, WDR, Novabot, etc alternative.  
 Works with [RealDeviceMap](https://github.com/123FLO321/RealDeviceMap)  
 
 
 ## Description:  
-Sends Discord notifications based on pre-defined filters for Pokemon, raids, raid eggs, field research quests, gym team changes, and weather. Also supports Discord user's subscribing to Pokemon, raid, quest, and Team Rocket invasion notifications via DM.
+Sends Discord notifications based on pre-defined filters for Pokemon, raids, raid eggs, field research quests, Team Rocket invasions, gym team changes, and weather. Also supports Discord user's subscribing to Pokemon, raid, quest, and Team Rocket invasion notifications via DM.
 
 
 ## Features:  
@@ -13,15 +18,16 @@ Sends Discord notifications based on pre-defined filters for Pokemon, raids, rai
 - Discord channel alarm reports for Pokemon, raids, eggs, quests, lures, invasions, gym team changes, and weather.  
 - Per user custom Discord notifications for Pokemon, raids, quests, and invasions.  
 - User interface to configure Discord notifications with ease (as well as Discord commands). (https://github.com/versx/WhMgr-UI)  
-- Notifications based on pre-defined distance.  
+- Subscription notifications based on pre-defined distance.  
 - Customizable alert messages with dynamic text replacement.  
-- Support for multiple cities/areas using roles and geofences per server.  
+- Support for multiple cities/areas using geofences per server.  
 - Daily shiny stats reporting.  
 - Automatic quest message purge at midnight.  
 - Support for Donors/Supporters only notifications.  
 - Direct messages of Pokemon notifications based on city roles assigned.  
+- Pokemon and Raid subscription notifications based on specific forms.  
 - Custom prefix support as well as mentionable user support for commands.  
-- Subscriptions based on distance from a set location or specific gym names.  
+- Raid subscription notifications for specific gyms.  
 - Twilio text message alerts for ultra rare Pokemon.  
 - Custom image support for Discord alarm reports.  
 - Custom icon style selection for Discord user notifications.  
@@ -29,10 +35,17 @@ Sends Discord notifications based on pre-defined filters for Pokemon, raids, rai
 - Custom static map format support.  
 - Support for language translation.  
 - Multi threaded, low processing consumption.  
+- [I.C.O.N.S.](https://github.com/Mygod/pokemon-icon-postprocessor) standard image support.
 - Lots more...  
 
 ## Documentation:  
 [ReadTheDocs](https://whmgr.rtfd.io/)  
+
+## Terminology:  
+- **Alerts:** Discord message structures for channel messages or direct message subscriptions
+- **Subscriptions:** Custom user defined Pokemon, Raid, Quest, Invasion, or Gym direct messages subscriptions
+- **Geofences:** Area restrictions per Alarm
+- **Alarms:** Discord channel messages
 
 ## Getting Started:  
 
@@ -45,8 +58,8 @@ Windows:
 bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://raw.githubusercontent.com/versx/WhMgr/master/install.bat install.bat | start install.bat  
 ```
 2.) Edit `config.json` either open in Notepad/++ or `vi config.json`.  
-  a.) [Create bot token](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token)  
-  b.) Input your bot token and config options.  
+  - [Create bot token](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token)  
+  - Input your bot token and config options.  
 ```js
 {
     // Http listening interface for raw webhook data.
@@ -61,7 +74,7 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
     "stripeApiKey": ""
     // List of Discord servers to connect and post webhook messages to.
     "servers": {
-        // Discord server #1 guild ID
+        // Discord server #1 guild ID (replace `000000000000000001` with guild id of server)
         "000000000000000001": {
             // Bot command prefix, leave blank to use @mention <command>
             "commandPrefix": ".",
@@ -73,19 +86,35 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
             "donorRoleIds": [
                 000000000000000000
             ],
-            // Moderator Discord ID(s).
-            "moderatorIds": [
+            // Moderator Discord role ID(s).
+            "moderatorRoleIds": [
                 000000000000000000
             ],
             // Discord bot token with user.
             "token": "<DISCORD_BOT_TOKEN>",
             // Alarms file path.
             "alarms": "alarms.json",
-            // Enable custom direct message notification subscriptions.
-            "enableSubscriptions": false,
+            // Custom user subscriptions
+            "subscriptions": {
+                // Enable or disable custom direct message notification subscriptions per user.
+                "enabled": false,
+                // Maximum amount of Pokemon subscriptions a user can set, set as 0 for no limit.
+                "maxPokemonSubscriptions": 0,
+                // Maximum amount of PvP subscriptions a user can set, set as 0 for no limit.
+                "maxPvPSubscriptions": 0,
+                // Maximum amount of Raid subscriptions a user can set, set as 0 for no limit.
+                "maxRaidSubscriptions": 0,
+                // Maximum amount of Quest subscriptions a user can set, set as 0 for no limit.
+                "maxQuestSubscriptions": 0,
+                // Maximum amount of Invasion subscriptions a user can set, set as 0 for no limit.
+                "maxInvasionSubscriptions": 0,
+                // Maximum amount of Gym subscriptions a user can set, set as 0 for no limit.
+                "maxGymSubscriptions": 0
+            },
             // Enable city role assignments.
             "enableCities": false,
-            // City/geofence role(s)
+            // City/geofence role(s) used to assign city roles (if enabled) as well as depict what
+	    // geofences are related to which Discord guild. **NOT** used for subscriptions.
             "cityRoles": [
                 "City1",
                 "City2"
@@ -100,6 +129,8 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
             ],
             // Channel ID to post nests.
             "nestsChannelId": 000000000000000000,
+            // Minimum amount of average spawn count per hour for nest to post
+            "nestsMinimumPerHour": 2,
             // Shiny stats configuration
             "shinyStats": {
                 // Enable shiny stats posting.
@@ -125,12 +156,28 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
             "donorRoleIds": [
                 000000000000000000
             ],
-            "moderatorIds": [
+            "moderatorRoleIds": [
                 000000000000000000
             ],
             "token": "<DISCORD_BOT_TOKEN>",
             "alarms": "alarms2.json",
-            "enableSubscriptions": false,
+            // Custom user subscriptions
+            "subscriptions": {
+                // Enable or disable custom direct message notification subscriptions per user.
+                "enabled": false,
+                // Maximum amount of Pokemon subscriptions a user can set, set as 0 for no limit.
+                "maxPokemonSubscriptions": 0,
+                // Maximum amount of PvP subscriptions a user can set, set as 0 for no limit.
+                "maxPvPSubscriptions": 0,
+                // Maximum amount of Raid subscriptions a user can set, set as 0 for no limit.
+                "maxRaidSubscriptions": 0,
+                // Maximum amount of Quest subscriptions a user can set, set as 0 for no limit.
+                "maxQuestSubscriptions": 0,
+                // Maximum amount of Invasion subscriptions a user can set, set as 0 for no limit.
+                "maxInvasionSubscriptions": 0,
+                // Maximum amount of Gym subscriptions a user can set, set as 0 for no limit.
+                "maxGymSubscriptions": 0
+            },
             "enableCities": false,
             "cityRoles": [
                 "City3",
@@ -142,6 +189,7 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
                 000000000000000000
             ],
             "nestsChannelId": 000000000000000000,
+            "nestsMinimumPerHour": 2,
             "shinyStats": {
                 "enabled": true,
                 "clearMessages": false,
@@ -202,6 +250,8 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
         456,
         320
     ],
+	// Minimum IV value for an event Pokemon to have to meet in order to post via Discord channel alarm or direct message subscription.
+    "eventMinimumIV": "90",
     // Image URL config
     "urls": {
         // Static tile map images template.
@@ -255,7 +305,7 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
     "gmapsKey": "",
     // Minimum despawn time in minutes a Pokemon must have in order to send the alarm (default: 5 minutes)
     "despawnTimeMinimumMinutes": 5,
-    // Log webhook payloads to a file for debugging
+    // Log webhook payloads to a file for debugging (do not enable unless you're having issues receiving data
     "debug": false,
     // Only show logs with higher or equal priority levels (Trace, Debug, Info, Warning, Error, Fatal, None)
     "logLevel": "Trace"
@@ -339,15 +389,17 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
 33.02,-118.02
 33.03,-118.03
 ```
+**GeoJSON to individual INI format geofence files converter:** https://gist.github.com/versx/a0915c6bd95a080b6ff60cd539d4feb6  
 7.) Add dotnet to your environment path if it isn't already (optional): `export PATH=~/.dotnet/dotnet:$PATH`  
 8.) Build executable `dotnet build ../../..` (if dotnet is in your path) otherwise `~/.dotnet/dotnet build ../../..`  
 9.) Start WhMgr `dotnet WhMgr.dll` (if dotnet is in your path) otherwise `~/.dotnet/dotnet WhMgr.dll` (If Windows, run as Administrator)  
-10.) Optional User Interface for members to create subscriptions from a website instead of using Discord commands. (Still WIP but mostly done) [WhMgr UI](https://github.com/versx/WhMgr-UI)  
+10.) Optional User Interface for members to create subscriptions from a website instead of using Discord commands. [WhMgr UI](https://github.com/versx/WhMgr-UI)  
+11.) Optional reverse location lookup with OpenStreetMaps Nominatim instead of Google Maps, install instructions [here](https://nominatim.org/release-docs/develop/admin/Installation/)  
 
 ## Updating  
-1.) Pull latest changes in root folder  
-2.) Build project `dotnet build`  
-3.) Run `dotnet bin/debug/netcoreapp2.1/WhMgr.dll`  
+1. Pull latest changes in root folder  
+1. Build project `dotnet build`  
+1. Run `dotnet bin/debug/netcoreapp2.1/WhMgr.dll`  
 
 **Important Notes:**  
 - Upon starting, database tables will be automatically created if `enableSubscriptions` is set to `true`. Emoji icons are also created in the specified `EmojiGuildId` upon connecting to Discord.  
@@ -380,7 +432,7 @@ bitsadmin /transfer dotnet-install-job /download /priority FOREGROUND https://ra
 * `enable` Enable direct message subscriptions  
 * `disable` Disable direct message subscriptions  
 * `info` List all Pokemon, Raid, Quest, Invasion, and Gym subscriptions and settings  
-* `set-distance`  Set minimum distance to Pokemon, raids, quests, invasions and gyms need to be within. (Measured in meters)  
+* `set-distance`  Set minimum distance to Pokemon, PvP, raids, quests, invasions and gyms need to be within. (Measured in meters) If a distance is set, subscribed geofences will be ignored.  
 * `expire` / `expires` Check stripe API when Donor/Supporter subscription expires  
 * `set-number` Sets the phone number to use for text message alerts for ultra rare Pokemon  
 
@@ -718,7 +770,7 @@ __**Quests**__
 | br | Newline break | `\r\n`
 
 
-## TODO:  
+## TODO  
 - Allow Pokemon id and name in Pokemon filter lists.  
 - Individual filters per Pokemon. (PA style, maybe)  
 - PvP ranks DTS
@@ -726,16 +778,19 @@ __**Quests**__
 - Wiki.  
 
 
-## Examples:  
+## Previews  
 *All examples are completely customizable using Dynamic Text Replacement/Substitution*  
 Discord Pokemon Notifications:  
 ![Pokemon Notifications](images/pkmn.png "Pokemon Notifications")  
 
+Discord Pokemon PVP Notifications:  
+![Pokemon Notifications](images/pvp.png "Pokemon PVP Notifications")  
+
 Discord Raid Notifications:  
-![Raid Notifications](images/raid.png "Raid Notifications")  
+![Raid Notifications](images/raids.png "Raid Notifications")  
 
 Discord Raid Egg Notifications:  
-![Egg Notifications](images/egg.png "Egg Notifications")  
+![Egg Notifications](images/eggs.png "Egg Notifications")  
 
 Discord Quest Notifications:  
 ![Quest Notifications](images/quests.png "Quest Notifications")  
@@ -758,13 +813,14 @@ Discord Gym Team Takeover Notifications:
 Discord Team Rocket Invasion Notifications:  
 ![Team Rocket Invasion Notifications](images/invasions.png "Team Rocket Invasion Notifications")  
 
-## Current Issues:  
+Discord Weather Notifications:  
+![Weather Notifications](images/weather.png "Weather Notifications")  
+
+
+## Current Issues  
 - Pokemon subscriptions are based on Discord city roles assigned currently, soon it will be based on specified cities.  
 
-## Credits:  
+## Credits  
 [versx](https://github.com/versx) - Developer  
 [PokeAlarm](https://github.com/PokeAlarm/PokeAlarm) - Dynamic Text Substitution idea  
 [WDR](https://github.com/PartTimeJS/WDR) - masterfile.json file  
-
-## Discord  
-https://discordapp.com/invite/zZ9h9Xa  

@@ -27,18 +27,11 @@
     using DSharpPlus.Interactivity;
 
     // TODO: Subscriptions, Pokemon, Raid, Quest, Invasion, Gym, Weather alarm statistics by day. date/pokemonId/count
-    // TODO: Specific timezone per Discord
-    // TODO: Account status alarms
     // TODO: List all subscriptions with info command
-    // TODO: Manage subscriptions via DM again
     // TODO: Multiple discord bot tokens per server
-    // TODO: Only start database migrator if subscriptions are enabled
     // TODO: Check nests again
-    // TODO: Allow roles with spaces
     // TODO: IV wildcards
     // TODO: Egg subscriptions (maybe)
-    // TODO: Osm nominatim reverse geocoding
-    // TODO: Fix race condition between incoming messages and when emojis list is initialized
 
     public class Bot
     {
@@ -66,19 +59,15 @@
             _whConfig = whConfig;
             _whm = new WebhookController(_whConfig);
 
+            // Build form lists for icons
+            IconFetcher.Instance.SetIconStyles(_whConfig.IconStyles);
+
             // Set translation language
             Translator.Instance.SetLocale(_whConfig.Locale);
 
             // Set database connection strings to static properties so we can access within our extension classes
             DataAccessLayer.ConnectionString = _whConfig.Database.Main.ToString();
             DataAccessLayer.ScannerConnectionString = _whConfig.Database.Scanner.ToString();
-
-            // Start database migrator
-            var migrator = new DatabaseMigrator();
-            while (!migrator.Finished)
-            {
-                Thread.Sleep(50);
-            }
 
             // Set unhandled exception event handler
             AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionHandler;
@@ -89,8 +78,16 @@
             midnight.Start();
 
             // Initialize the subscription processor if at least one Discord server wants custom notifications
-            if (_whConfig.Servers.Values.ToList().Exists(x => x.EnableSubscriptions))
+            // and start database migrator
+            if (_whConfig.Servers.Values.ToList().Exists(x => x.Subscriptions.Enabled))
             {
+                // Start database migrator
+                var migrator = new DatabaseMigrator();
+                while (!migrator.Finished)
+                {
+                    Thread.Sleep(50);
+                }
+
                 _subProcessor = new SubscriptionProcessor(_servers, _whConfig, _whm);
             }
 
@@ -100,6 +97,7 @@
             {
                 var guildId = keys[i];
                 var server = _whConfig.Servers[guildId];
+                server.LoadDmAlerts();
                 var client = new DiscordClient(new DiscordConfiguration
                 {
                     AutomaticGuildSync = true,
@@ -184,7 +182,7 @@
                 commands.RegisterCommands<Gyms>();
                 commands.RegisterCommands<Quests>();
                 commands.RegisterCommands<Settings>();
-                if (server.EnableSubscriptions)
+                if (server.Subscriptions.Enabled)
                 {
                     commands.RegisterCommands<Notifications>();
                 }
@@ -240,7 +238,7 @@
             _whm.GymDetailsAlarmTriggered += OnGymDetailsAlarmTriggered;
             _whm.WeatherAlarmTriggered += OnWeatherAlarmTriggered;
             // At least one server wants subscriptions
-            if (_whConfig.Servers.FirstOrDefault(x => x.Value.EnableSubscriptions).Value != null)
+            if (_whConfig.Servers.FirstOrDefault(x => x.Value.Subscriptions.Enabled).Value != null)
             {
                 // Register subscription event handlers
                 _whm.PokemonSubscriptionTriggered += OnPokemonSubscriptionTriggered;
@@ -248,6 +246,7 @@
                 _whm.QuestSubscriptionTriggered += OnQuestSubscriptionTriggered;
                 _whm.InvasionSubscriptionTriggered += OnInvasionSubscriptionTriggered;
             }
+            _whm.Start();
 
             _logger.Info("WebhookManager is running...");
         }
@@ -281,7 +280,7 @@
             _whm.GymAlarmTriggered -= OnGymAlarmTriggered;
             _whm.GymDetailsAlarmTriggered -= OnGymDetailsAlarmTriggered;
             _whm.WeatherAlarmTriggered -= OnWeatherAlarmTriggered;
-            if (_whConfig.Servers.FirstOrDefault(x => x.Value.EnableSubscriptions).Value != null)
+            if (_whConfig.Servers.FirstOrDefault(x => x.Value.Subscriptions.Enabled).Value != null)
             {
                 //At least one server wanted subscriptions, unregister the subscription event handlers
                 _whm.PokemonSubscriptionTriggered -= OnPokemonSubscriptionTriggered;
@@ -289,6 +288,7 @@
                 _whm.QuestSubscriptionTriggered -= OnQuestSubscriptionTriggered;
                 _whm.InvasionSubscriptionTriggered -= OnInvasionSubscriptionTriggered;
             }
+            _whm.Stop();
 
             _logger.Info("WebhookManager is stopped...");
         }
@@ -864,10 +864,10 @@
                 }
             }
 
-            await LoadEmojis();
+            await CacheGuildEmojisList();
         }
 
-        private async Task LoadEmojis()
+        private async Task CacheGuildEmojisList()
         {
             _logger.Trace($"LoadEmojis");
 
@@ -904,7 +904,6 @@
         private async Task OnMidnightTimer()
         {
             _logger.Debug($"MIDNIGHT {DateTime.Now}");
-            _logger.Debug($"Starting automatic quest messages cleanup...");
 
             Statistics.WriteOut();
             Statistics.Instance.Reset();
@@ -923,12 +922,22 @@
                 var client = _servers[guildId];
                 if (server.ShinyStats.Enabled)
                 {
+                    _logger.Debug($"Starting Shiny Stat posting...");
                     await PostShinyStats(client, guildId, server);
                 }
-
-                if (server.PruneQuestChannels)
+                else
                 {
+                    _logger.Debug($"Shiny Stat posting not enabled...skipping");
+                }
+
+                if (server.PruneQuestChannels && server.QuestChannelIds.Count > 0)
+                {
+                    _logger.Debug($"Starting automatic quest messages cleanup...");
                     await PruneQuestChannels(client, server);
+                }
+                else
+                {
+                    _logger.Debug($"Quest cleanup not enabled...skipping");
                 }
 
                 Thread.Sleep(10 * 1000);
@@ -1035,7 +1044,7 @@
                 var guildId = keys[i];
                 var client = _servers[guildId];
                 var server = _whConfig.Servers[guildId];
-                if (!server.EnableSubscriptions)
+                if (!server.Subscriptions.Enabled)
                     return;
 
                 _logger.Debug($"Checking if there are any subscriptions for members that are no longer apart of the server...");
